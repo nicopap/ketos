@@ -445,10 +445,7 @@ impl AttrOpts {
 }
 
 fn is_outer(style: AttrStyle) -> bool {
-    match style {
-        AttrStyle::Outer => true,
-        _ => false
-    }
+    matches!(style, AttrStyle::Outer)
 }
 
 fn lit_str(lit: &Lit) -> Result<String, Error> {

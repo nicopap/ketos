@@ -40,7 +40,7 @@ impl Clone for SystemFn {
 
 impl PartialEq for SystemFn {
     fn eq(&self, rhs: &SystemFn) -> bool {
-        self.callback as *const () == rhs.callback as *const ()
+        std::ptr::eq(self.callback as *const (), rhs.callback as *const ())
     }
 }
 
@@ -337,7 +337,7 @@ pub struct Lambda {
     /// A weak reference is used to prevent cycles.
     pub scope: WeakScope,
     /// Enclosed values
-    pub values: Option<Rc<Box<[Value]>>>,
+    pub values: Option<Rc<[Value]>>,
 }
 
 impl Lambda {
@@ -351,11 +351,11 @@ impl Lambda {
     }
 
     /// Creates a new `Lambda` enclosing a set of values.
-    pub fn new_closure(code: Rc<Code>, scope: WeakScope, values: Box<[Value]>) -> Lambda {
+    pub fn new_closure(code: Rc<Code>, scope: WeakScope, values: Vec<Value>) -> Lambda {
         Lambda{
             code,
             scope,
-            values: Some(Rc::new(values)),
+            values: Some(values.into()),
         }
     }
 }
@@ -374,7 +374,7 @@ impl PartialEq for Lambda {
     fn eq(&self, rhs: &Lambda) -> bool {
         let a: &Code = &self.code;
         let b: &Code = &rhs.code;
-        (a as *const _) == (b as *const _)
+        std::ptr::eq(a, b)
     }
 }
 
@@ -1241,10 +1241,7 @@ fn fn_is_instance(_ctx: &Context, args: &mut [Value]) -> Result<Value, Error> {
 
 /// `null` returns whether the given value is unit, `()`.
 fn fn_null(_ctx: &Context, args: &mut [Value]) -> Result<Value, Error> {
-    let is_null = match args[0] {
-        Value::Unit => true,
-        _ => false
-    };
+    let is_null = matches!(args[0], Value::Unit);
 
     Ok(is_null.into())
 }

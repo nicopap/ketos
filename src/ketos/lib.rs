@@ -26,7 +26,6 @@
 
 #![deny(missing_docs)]
 #![allow(clippy::new_without_default)]
-#![allow(clippy::new_without_default_derive)]
 #![allow(clippy::float_cmp)]
 
 #[cfg(test)]
@@ -92,4 +91,3 @@ pub mod value;
 
 mod mod_code;
 mod mod_math;
-mod mod_random;

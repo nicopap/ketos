@@ -2,7 +2,7 @@
 
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::fmt;
-use std::mem::replace;
+use std::mem::{take, replace};
 use std::rc::Rc;
 
 use crate::bytecode::{
@@ -330,7 +330,7 @@ impl<'a> Compiler<'a> {
             }
         }
 
-        replace(&mut self.blocks, new_blocks);
+        self.blocks = new_blocks;
 
         for block in &mut self.blocks {
             if let Some((_, dest)) = block.jump {
@@ -347,7 +347,7 @@ impl<'a> Compiler<'a> {
         self.compile_value(value)?;
 
         let code = self.assemble_code()?;
-        let consts = replace(&mut self.consts, Vec::new());
+        let consts = take(&mut self.consts);
 
         Ok(Code{
             name: None,
@@ -443,8 +443,8 @@ impl<'a> Compiler<'a> {
         self.compile_value(value)?;
 
         let code = self.assemble_code()?;
-        let consts = replace(&mut self.consts, Vec::new());
-        let captures = replace(&mut self.captures, Vec::new());
+        let consts = take(&mut self.consts);
+        let captures = take(&mut self.captures);
 
         let code = Code{
             name,
@@ -596,7 +596,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn take_trace(&mut self) -> Trace {
-        Trace::new(replace(&mut self.trace, Vec::new()), self.trace_expr.take())
+        Trace::new(take(&mut self.trace), self.trace_expr.take())
     }
 
     fn is_macro(&self, name: Name) -> bool {
@@ -676,7 +676,7 @@ impl<'a> Compiler<'a> {
         let n_args = args.len();
 
         match name {
-            standard_names::IF if n_args >= 2 && n_args <= 3 => {
+            standard_names::IF if (2..=3).contains(&n_args) => {
                 let mut cond = Borrowed(&args[0]);
 
                 match self.eval_constant(&cond)? {
@@ -1455,7 +1455,7 @@ impl<'a> Compiler<'a> {
 fn is_const_system_fn(name: Name) -> bool {
     use crate::name::standard_names::*;
 
-    match name {
+    matches!(name,
         ADD | SUB | MUL | POW | DIV | FLOOR_DIV |
         REM | SHL | SHR | BIT_AND | BIT_OR | BIT_XOR | BIT_NOT |
         EQ | NOT_EQ | WEAK_EQ | WEAK_NE | LT | GT | LE | GE |
@@ -1467,9 +1467,7 @@ fn is_const_system_fn(name: Name) -> bool {
         CHARS | STRING | PATH | BYTES |
         ID | IS | IS_INSTANCE | NULL | TYPE_OF |
         XOR | NOT
-            => true,
-        _ => false
-    }
+    )
 }
 
 /// Fold constants for an anticommutative operation.
@@ -1857,7 +1855,7 @@ fn op_define(compiler: &mut Compiler, args: &[Value]) -> Result<(), Error> {
 
             let (doc, body) = extract_doc_string(args)?;
             test_define_name(compiler.scope(), name)?;
-            compiler.compile_value(&body)?;
+            compiler.compile_value(body)?;
 
             if let Some(doc) = doc {
                 compiler.scope().add_doc_string(name, doc.to_owned());
@@ -1925,7 +1923,7 @@ fn op_macro(compiler: &mut Compiler, args: &[Value]) -> Result<(), Error> {
     test_define_name(compiler.scope(), name)?;
 
     let (lambda, captures) = make_lambda(compiler,
-        Some(name), params, &body, doc)?;
+        Some(name), params, body, doc)?;
 
     if !captures.is_empty() {
         return Err(From::from(CompileError::SyntaxError(

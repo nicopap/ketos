@@ -512,15 +512,15 @@ fn parse_number(input: &str) -> Result<(Token, usize), ParseErrorKind> {
     let mut slash_digit = false;
     let mut size = input.len();
 
-    let (base, prefix_offset, rest) = if input.starts_with("0x") {
-        (16, 2, &input[2..])
-    } else if input.starts_with("0o") {
-        (8, 2, &input[2..])
-    } else if input.starts_with("0b") {
-        (2, 2, &input[2..])
-    } else if input.starts_with('-') {
-        match input[1..].chars().next() {
-            Some(ch) if ch.is_digit(10) => (10, 1, &input[1..]),
+    let (base, prefix_offset, rest) = if let Some(stripped) = input.strip_prefix("0x") {
+        (16, 2, stripped)
+    } else if let Some(stripped) = input.strip_prefix("0o") {
+        (8, 2, stripped)
+    } else if let Some(stripped) = input.strip_prefix("0b") {
+        (2, 2, stripped)
+    } else if let Some(stripped) = input.strip_prefix('-') {
+        match stripped.chars().next() {
+            Some(ch) if ch.is_digit(10) => (10, 1, stripped),
             // Actually a name beginning with '-' rather a number
             _ => return parse_name(input)
         }

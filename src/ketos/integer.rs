@@ -54,7 +54,7 @@ impl Integer {
     /// Returns the number of bits required to represent the `Integer`.
     #[inline]
     pub fn bits(&self) -> usize {
-        self.0.bits()
+        self.0.bits() as usize
     }
 
     /// Creates an `Integer` from a sign and a series of big-endian bytes.

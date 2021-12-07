@@ -626,11 +626,7 @@ impl Instruction {
     /// that is, in valid top-level code, it does not produce any side effects.
     pub fn is_trivial(&self) -> bool {
         use self::Instruction::*;
-
-        match *self {
-            Unit | True | False | Const(_) | Return => true,
-            _ => false
-        }
+        matches!(*self, Unit | True | False | Const(_) | Return)
     }
 
     /// If the instruction is a jump instruction, returns the jump offset.
@@ -918,10 +914,7 @@ impl CodeBlock {
     pub fn is_mostly_empty(&self) -> bool {
         use self::Instruction::*;
 
-        self.bytes.is_empty() && match self.instr_part {
-            Some(Skip(_)) | Some(Return) | None => true,
-            _ => false
-        }
+        self.bytes.is_empty() && matches!(self.instr_part, Some(Skip(_)) | Some(Return) | None)
     }
 
     /// Sets the block which will immediately follow this block.

@@ -599,7 +599,7 @@ impl<'fmt, 'names, 'value> StringFormatter<'fmt, 'names, 'value> {
         let col_inc = self.get_u32_field(&mut fields, dir.span)?.unwrap_or(1);
         self.no_fields(fields, dir.span)?;
 
-        let cur_col = cur_line_len(&buf) as u32;
+        let cur_col = cur_line_len(buf) as u32;
 
         if !dir.at {
             if cur_col < col_num {
@@ -691,7 +691,7 @@ impl<'fmt, 'names, 'value> StringFormatter<'fmt, 'names, 'value> {
         let mut fields = FieldParser::new(dir.fields);
 
         match self.get_u32_field(&mut fields, dir.span)? {
-            Some(n) if n >= 2 && n <= 36 => {
+            Some(n) if (2..=36).contains(&n) => {
                 let new_dir = Directive{fields: fields.rest(), ..*dir};
                 return self.format_integer(&new_dir, buf, n);
             }
@@ -776,10 +776,7 @@ impl<'fmt, 'names, 'value> StringFormatter<'fmt, 'names, 'value> {
     }
 
     fn peek_char(&mut self) -> Option<char> {
-        match self.chars.clone().next() {
-            Some((_, ch)) => Some(ch),
-            None => None
-        }
+        self.chars.clone().next().map(|tpl| tpl.1)
     }
 
     fn arguments_empty(&self) -> bool {
@@ -1040,7 +1037,7 @@ impl<'fmt, 'names, 'value> StringFormatter<'fmt, 'names, 'value> {
             }
 
             if let Some(pre) = pre {
-                if cur_line_len(&buf) + temp.len() > line_len as usize {
+                if cur_line_len(buf) + temp.len() > line_len as usize {
                     buf.push_str(&pre);
                 }
             }
@@ -1602,9 +1599,9 @@ fn pad_str(buf: &mut String, s: &str, min_col: u32, col_inc: u32,
 
         if left {
             buf.extend(repeat(pad_char).take(n as usize));
-            buf.push_str(&s);
+            buf.push_str(s);
         } else {
-            buf.push_str(&s);
+            buf.push_str(s);
             buf.extend(repeat(pad_char).take(n as usize));
         }
     }
@@ -1631,14 +1628,10 @@ fn make_uppercase(s: &mut String, start: usize) {
 }
 
 fn make_title_case(s: &mut String, mut start: usize) {
-    loop {
-        let (off, len) = match s[start..].split_whitespace().next() {
-            Some(word) => (slice_offset(s, word), word.len()),
-            None => break
-        };
-
-        make_first_uppercase(s, off);
-        start = off + len;
+    while let Some(word) = s[start..].split_whitespace().next() {
+        let offset = slice_offset(s, word);
+        start = offset + word.len();
+        make_first_uppercase(s, offset);
     }
 }
 

@@ -457,8 +457,7 @@ struct StackFrame {
     /// Code scope
     scope: Scope,
     /// Closure values
-    // TODO: When Rc<[T]> is possible for non-static [T], change this.
-    values: Option<Rc<Box<[Value]>>>,
+    values: Option<Rc<[Value]>>,
     /// Instruction pointer
     iptr: u32,
     /// Stack pointer
@@ -706,8 +705,7 @@ impl Machine {
             ref v => return Err(ExecError::expected("lambda", v))
         };
 
-        let values = self.drain_stack_top(n_values)?
-            .collect::<Vec<_>>().into_boxed_slice();
+        let values = self.drain_stack_top(n_values)?.collect();
 
         self.value = Value::Lambda(Lambda::new_closure(code, scope, values));
         Ok(())
@@ -740,7 +738,7 @@ impl Machine {
 
     fn get_sys_fn(&self, n: u32) -> Result<(Name, &'static SystemFn), ExecError> {
         get_standard_name(n).and_then(|n| get_system_fn(n).map(|f| (n, f)))
-            .ok_or_else(|| ExecError::InvalidSystemFn(n))
+            .ok_or(ExecError::InvalidSystemFn(n))
     }
 
     fn call_sys(&mut self, frame: &mut StackFrame, n: u32) -> Result<(), Error> {
@@ -1114,7 +1112,7 @@ impl Machine {
     fn get_value(&self, frame: &StackFrame, name: Name) -> Result<Value, ExecError> {
         MasterScope::get(name)
             .or_else(|| frame.scope.get_value(name))
-            .ok_or_else(|| ExecError::NameError(name))
+            .ok_or(ExecError::NameError(name))
     }
 
     fn get_def_push(&mut self, frame: &StackFrame, n: u32) -> Result<(), Error> {
@@ -1228,18 +1226,18 @@ impl Machine {
     }
 
     fn get_stack(&self, n: u32) -> Result<&Value, ExecError> {
-        self.stack.get(n as usize).ok_or_else(|| ExecError::InvalidStack(n))
+        self.stack.get(n as usize).ok_or(ExecError::InvalidStack(n))
     }
 
     /// Returns a reference to an enclosed value.
     fn get_closure_value<'f>(&self, frame: &'f StackFrame, n: u32)
             -> Result<&'f Value, ExecError> {
         frame.values.as_ref().and_then(|v| v.get(n as usize))
-            .ok_or_else(|| ExecError::InvalidClosureValue(n))
+            .ok_or(ExecError::InvalidClosureValue(n))
     }
 
     fn get_stack_mut(&mut self, n: u32) -> Result<&mut Value, ExecError> {
-        self.stack.get_mut(n as usize).ok_or_else(|| ExecError::InvalidStack(n))
+        self.stack.get_mut(n as usize).ok_or(ExecError::InvalidStack(n))
     }
 
     /// Returns a value from the stack `n` values from the top.
@@ -1351,21 +1349,13 @@ impl Machine {
     }
 
     fn test_is_null(&mut self) {
-        let null = match self.value {
-            Value::Unit => true,
-            _ => false
-        };
-
+        let null = matches!(self.value, Value::Unit);
         self.value = null.into();
     }
 
     fn test_is_not_null(&mut self) {
-        let null = match self.value {
-            Value::Unit => true,
-            _ => false
-        };
-
-        self.value = (!null).into();
+        let null = !matches!(self.value, Value::Unit);
+        self.value = null.into();
     }
 
     fn equal(&mut self) -> Result<(), ExecError> {
@@ -1384,14 +1374,14 @@ impl Machine {
 
     fn equal_const(&mut self, code: &Code, n: u32) -> Result<(), ExecError> {
         let c = get_const(code, n)?;
-        let r = self.value.is_equal(&c)?;
+        let r = self.value.is_equal(c)?;
         self.value = r.into();
         Ok(())
     }
 
     fn not_equal_const(&mut self, code: &Code, n: u32) -> Result<(), ExecError> {
         let c = get_const(code, n)?;
-        let r = self.value.is_equal(&c)?;
+        let r = self.value.is_equal(c)?;
         self.value = (!r).into();
         Ok(())
     }
@@ -1492,7 +1482,7 @@ fn get_bool(v: &Value) -> Result<bool, ExecError> {
 }
 
 fn get_const(code: &Code, n: u32) -> Result<&Value, ExecError> {
-    code.consts.get(n as usize).ok_or_else(|| ExecError::InvalidConst(n))
+    code.consts.get(n as usize).ok_or(ExecError::InvalidConst(n))
 }
 
 fn get_keyword(v: &Value) -> Result<Name, ExecError> {

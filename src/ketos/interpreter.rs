@@ -17,7 +17,7 @@ use crate::name::{debug_names, display_names, NameStore};
 use crate::parser::{ParseError, Parser};
 use crate::restrict::RestrictConfig;
 use crate::scope::{GlobalScope, Scope};
-use crate::structs::{StructDefMap};
+use crate::structs::StructDefMap;
 use crate::trace::{get_traceback, take_traceback, Trace};
 use crate::value::Value;
 
@@ -230,8 +230,8 @@ impl Interpreter {
         Interpreter::with_scope(
             Rc::new(GlobalScope::new(
                 name,
-                names.clone(),
-                codemap.clone(),
+                names,
+                codemap,
                 modules,
                 io,
                 defs)))
@@ -357,7 +357,7 @@ impl Interpreter {
     pub fn call(&self, name: &str, args: Vec<Value>) -> Result<Value, Error> {
         let name = self.scope().borrow_names_mut().add(name);
 
-        let v = self.scope().get_value(name).ok_or_else(|| ExecError::NameError(name))?;
+        let v = self.scope().get_value(name).ok_or(ExecError::NameError(name))?;
         self.call_value(v, args)
     }
 

@@ -75,7 +75,7 @@ enum SerializeState {
 impl<'a> VSerializer<'a> {
     fn new(scope: &Scope) -> VSerializer {
         VSerializer{
-            scope: scope,
+            scope,
             value: None,
             state: Vec::new(),
         }
@@ -119,10 +119,7 @@ impl<'a> VSerializer<'a> {
     }
 
     fn expect_field(&self) -> bool {
-        match self.state.last() {
-            Some(&SerializeState::StructKey(_)) => true,
-            _ => false
-        }
+        matches!(self.state.last(), Some(&SerializeState::StructKey(_)))
     }
 
     fn begin_enum(&mut self, name: &str) {

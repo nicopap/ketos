@@ -88,14 +88,14 @@ impl Value {
             (&Value::Bool(a), &Value::Bool(b)) => a.cmp(&b),
             (&Value::Float(a), &Value::Float(b)) =>
                 a.partial_cmp(&b).ok_or(ExecError::CompareNaN)?,
-            (&Value::Integer(ref a), &Value::Integer(ref b)) => a.cmp(&b),
-            (&Value::Ratio(ref a), &Value::Ratio(ref b)) => a.cmp(&b),
+            (&Value::Integer(ref a), &Value::Integer(ref b)) => a.cmp(b),
+            (&Value::Ratio(ref a), &Value::Ratio(ref b)) => a.cmp(b),
             (&Value::Name(a), &Value::Name(b)) => a.cmp(&b),
             (&Value::Keyword(a), &Value::Keyword(b)) => a.cmp(&b),
             (&Value::Char(a), &Value::Char(b)) => a.cmp(&b),
-            (&Value::String(ref a), &Value::String(ref b)) => a.cmp(&b),
-            (&Value::Bytes(ref a), &Value::Bytes(ref b)) => a.cmp(&b),
-            (&Value::Path(ref a), &Value::Path(ref b)) => a.cmp(&b),
+            (&Value::String(ref a), &Value::String(ref b)) => a.cmp(b),
+            (&Value::Bytes(ref a), &Value::Bytes(ref b)) => a.cmp(b),
+            (&Value::Path(ref a), &Value::Path(ref b)) => a.cmp(b),
             (&Value::Unit, &Value::List(_)) => Ordering::Less,
             (&Value::List(_), &Value::Unit) => Ordering::Greater,
             (&Value::List(ref a), &Value::List(ref b)) =>
@@ -153,8 +153,8 @@ impl Value {
             (&Value::CommaAt(_, _), &Value::CommaAt(_, _)) =>
                 return Err(ExecError::CannotCompare("comma-at")),
 
-            (&Value::Foreign(ref a), ref b) => a.compare_to_value(b)?,
-            (ref a, &Value::Foreign(ref b)) =>
+            (&Value::Foreign(ref a), b) => a.compare_to_value(b)?,
+            (a, &Value::Foreign(ref b)) =>
                 flip_ordering(b.compare_to_value(a)?),
 
             // Type mismatch
@@ -200,7 +200,7 @@ impl Value {
             (&Value::Bytes(ref a), &Value::Bytes(ref b)) => a == b,
             (&Value::Path(ref a), &Value::Path(ref b)) => a == b,
             (&Value::Quote(ref a, na), &Value::Quote(ref b, nb)) =>
-                na == nb && a.is_equal(&b)?,
+                na == nb && a.is_equal(b)?,
             (&Value::Unit, &Value::List(_)) => false,
             (&Value::List(_), &Value::Unit) => false,
             (&Value::List(ref a), &Value::List(ref b)) =>
@@ -219,8 +219,8 @@ impl Value {
             (&Value::Function(ref a), &Value::Function(ref b)) => a == b,
             (&Value::Lambda(ref a), &Value::Lambda(ref b)) => a == b,
 
-            (&Value::Foreign(ref a), ref b) => a.is_equal_to_value(b)?,
-            (ref a, &Value::Foreign(ref b)) => b.is_equal_to_value(a)?,
+            (&Value::Foreign(ref a), b) => a.is_equal_to_value(b)?,
+            (a, &Value::Foreign(ref b)) => b.is_equal_to_value(a)?,
 
             (a, b) => return Err(ExecError::TypeMismatch{
                 lhs: a.type_name(),
@@ -785,7 +785,7 @@ fn is_normal(f: f64) -> bool {
 }
 
 fn is_printable(b: u8) -> bool {
-    b >= 0x20 && b <= 0x7e
+    (0x20..=0x7e).contains(&b)
 }
 
 fn flip_ordering(ord: Ordering) -> Ordering {

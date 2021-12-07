@@ -21,7 +21,6 @@ use crate::value::Value;
 
 use crate::mod_code;
 use crate::mod_math;
-use crate::mod_random;
 
 /// Contains the values in a loaded module's namespace.
 #[derive(Clone)]
@@ -54,7 +53,7 @@ impl ModuleBuilder {
 
         ModuleBuilder{
             name: mod_name,
-            scope: scope.clone(),
+            scope,
         }
     }
 
@@ -145,10 +144,7 @@ impl ModuleCode {
     /// Trivial code objects will be removed.
     pub fn new(mut code: Vec<Rc<Code>>, scope: &Scope) -> ModuleCode {
         fn is_lambda(v: &Value) -> bool {
-            match *v {
-                Value::Lambda(_) => true,
-                _ => false
-            }
+            matches!(*v, Value::Lambda(_))
         }
 
         code.retain(|code| !code.is_trivial());
@@ -165,8 +161,7 @@ impl ModuleCode {
                     .filter(|&&(_, ref v)| is_lambda(v))
                     .filter(|&&(name, _)| !scope.is_imported(name))
                     .cloned().collect()),
-            exports: scope.with_exports(|e| e.clone())
-                .unwrap_or_else(NameSetSlice::default),
+            exports: scope.with_exports(|e| e.clone()).unwrap_or_default(),
             imports: scope.with_imports(|i| i.to_vec()),
             module_doc: scope.with_module_doc(|d| d.to_owned()),
             docs: scope.with_docs(
@@ -326,7 +321,6 @@ fn get_loader(name: &str) -> Option<fn(Scope) -> Module> {
     match name {
         "code" => Some(mod_code::load),
         "math" => Some(mod_math::load),
-        "random" => Some(mod_random::load),
         _ => None
     }
 }

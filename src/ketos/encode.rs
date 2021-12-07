@@ -426,7 +426,7 @@ impl<'a, 'data> ValueDecoder<'a, 'data> {
                 let c = self.read_u32()?;
                 from_u32(c)
                     .map(Value::Char)
-                    .ok_or_else(|| DecodeError::InvalidChar(c))
+                    .ok_or(DecodeError::InvalidChar(c))
             }
             STRING => self.read_string().map(|s| s.into()),
             BYTES => self.read_byte_string().map(|s| s.into()),
@@ -570,7 +570,7 @@ impl<'a, 'data> ValueDecoder<'a, 'data> {
 
     fn read_name(&mut self, names: &NameInputConversion) -> Result<Name, DecodeError> {
         let n = self.read_uint()?;
-        names.get(n).ok_or_else(|| DecodeError::InvalidName(n))
+        names.get(n).ok_or(DecodeError::InvalidName(n))
     }
 
     fn read_string(&mut self) -> Result<&'data str, DecodeError> {
@@ -594,13 +594,12 @@ impl<'a, 'data> ValueDecoder<'a, 'data> {
     }
 
     fn read_u8(&mut self) -> Result<u8, DecodeError> {
-        Ok(self.data.read_u8()
-            .map_err(|_| DecodeError::UnexpectedEof)?)
+        self.data.read_u8().map_err(|_| DecodeError::UnexpectedEof)
     }
 
     fn read_u32(&mut self) -> Result<u32, DecodeError> {
-        Ok(self.data.read_u32::<BigEndian>()
-            .map_err(|_| DecodeError::UnexpectedEof)?)
+        self.data.read_u32::<BigEndian>()
+            .map_err(|_| DecodeError::UnexpectedEof)
     }
 
     fn read_len(&mut self) -> Result<usize, DecodeError> {
@@ -620,8 +619,8 @@ impl<'a, 'data> ValueDecoder<'a, 'data> {
     }
 
     fn read_f64(&mut self) -> Result<f64, DecodeError> {
-        Ok(self.data.read_f64::<BigEndian>()
-            .map_err(|_| DecodeError::UnexpectedEof)?)
+        self.data.read_f64::<BigEndian>()
+            .map_err(|_| DecodeError::UnexpectedEof)
     }
 }
 

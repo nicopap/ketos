@@ -289,11 +289,8 @@ impl<'a> StringReader<'a> {
         match self.peek_char()? {
             '\r' | '\n' => {
                 self.consume_char()?;
-                loop {
-                    match self.peek_char()? {
-                        ' ' | '\t' => { self.consume_char()?; },
-                        _ => break
-                    }
+                while let ' ' | '\t' = self.peek_char()? {
+                    self.consume_char()?;
                 }
                 Ok(None)
             }
@@ -305,11 +302,8 @@ impl<'a> StringReader<'a> {
         match self.peek_char()? {
             '\r' | '\n' => {
                 self.consume_char()?;
-                loop {
-                    match self.peek_char()? {
-                        ' ' | '\t' => { self.consume_char()?; },
-                        _ => break
-                    }
+                while let ' ' | '\t' = self.peek_char()? {
+                    self.consume_char()?;
                 }
                 Ok(None)
             }

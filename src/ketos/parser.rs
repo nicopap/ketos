@@ -273,10 +273,7 @@ impl<'a, 'lex> Parser<'a, 'lex> {
                     }
 
                     let any_paren = stack.iter().any(|group| {
-                        match *group {
-                            Group::Parens(_, _) => true,
-                            _ => false
-                        }
+                        matches!(*group,Group::Parens(_, _))
                     });
 
                     if any_paren {
@@ -543,7 +540,7 @@ fn check_integer(ctx: &Context, mut s: &str, base: u32) -> Result<(), RestrictEr
     }
 
     if s.starts_with('-') {
-        s = &s[1..].trim_start_matches('0');
+        s = s[1..].trim_start_matches('0');
     } else {
         s = s.trim_start_matches('0');
     }

@@ -1156,8 +1156,7 @@ fn test_float() {
     assert_eq!(eval("(float 123.0)").unwrap(), "123.0");
     assert_eq!(eval("(float 123/1)").unwrap(), "123.0");
 
-    assert_matches!(eval("(float (^ 10 309))").unwrap_err(),
-        Error::ExecError(ExecError::Overflow));
+    assert_eq!(eval("(float (^ 10 309))").unwrap(), "inf");
 }
 
 #[test]

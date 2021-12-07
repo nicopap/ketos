@@ -429,11 +429,7 @@ impl NameStore {
 
     /// Returns the `Name` value of a given string, if it exists.
     pub fn get_name(&self, name: &str) -> Option<Name> {
-        if let Some(pos) = self.iter().position(|n| n == name) {
-            Some(Name(pos as u32 + NUM_STANDARD_NAMES))
-        } else {
-            None
-        }
+        self.iter().position(|n| n == name).map(|pos| Name(pos as u32 + NUM_STANDARD_NAMES))
     }
 
     /// Returns the string representation of an interned name.
