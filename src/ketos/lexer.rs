@@ -3,16 +3,16 @@
 use std::iter::{once, repeat};
 use std::str::CharIndices;
 
-use crate::parser::{ParseError, ParseErrorKind};
+use crate::parser::{ParensKind, ParseError, ParseErrorKind};
 use crate::string;
 
 /// Represents a single unit of code input.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Token<'lex> {
-    /// Left parenthesis `(`
-    LeftParen,
-    /// Right parenthesis `)`
-    RightParen,
+    /// Left parenthesis `([{`
+    LeftParen(ParensKind),
+    /// Right parenthesis `)]}`
+    RightParen(ParensKind),
     /// A series of line comments beginning with `;;`,
     /// used to document declared values.
     DocComment(&'lex str),
@@ -52,8 +52,8 @@ impl<'lex> Token<'lex> {
     /// Returns a human-readable name of a token.
     pub fn name(&self) -> &'static str {
         match *self {
-            Token::LeftParen => "(",
-            Token::RightParen => ")",
+            Token::LeftParen(kind) => kind.open(),
+            Token::RightParen(kind) => kind.close(),
             Token::DocComment(_) => "doc-comment",
             Token::Float(_) => "float",
             Token::Integer(_, _) => "integer",
@@ -254,8 +254,8 @@ impl<'lex> Lexer<'lex> {
             let lo = self.cur_pos;
 
             let res = match ch {
-                '(' => Ok((Token::LeftParen, 1)),
-                ')' => Ok((Token::RightParen, 1)),
+                '(' | '{' | '[' => Ok((Token::LeftParen(ParensKind::from_char(ch).unwrap()), 1)),
+                ')' | '}' | ']' => Ok((Token::RightParen(ParensKind::from_char(ch).unwrap()), 1)),
                 '\'' => Ok((Token::Quote, 1)),
                 '`' => Ok((Token::BackQuote, 1)),
                 ',' => match chars.next() {
@@ -630,7 +630,7 @@ fn parse_raw_string(input: &str, pos: BytePos) -> Result<(Token, usize), ParseEr
 
 #[cfg(test)]
 mod test {
-    use super::{BytePos, Lexer, Span, Token};
+    use super::{BytePos, Lexer, Span, Token, ParensKind};
     use crate::parser::ParseErrorKind;
 
     fn sp(lo: BytePos, hi: BytePos) -> Span {
@@ -737,81 +737,81 @@ mod test {
         assert_eq!(tokens("foo"), [(sp(0, 3), Token::Name("foo"))]);
 
         assert_eq!(tokens("()"), [
-            (sp(0, 1), Token::LeftParen), (sp(1, 2), Token::RightParen)]);
+            (sp(0, 1), Token::LeftParen(ParensKind::Parens)), (sp(1, 2), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(foo)"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
              (sp(1, 4), Token::Name("foo")),
-             (sp(4, 5), Token::RightParen)]);
+             (sp(4, 5), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(foo bar baz)"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 4), Token::Name("foo")),
                 (sp(5, 8), Token::Name("bar")),
                 (sp(9, 12), Token::Name("baz")),
-            (sp(12, 13), Token::RightParen)]);
+            (sp(12, 13), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(foo\nbar\nbaz)"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 4), Token::Name("foo")),
                 (sp(5, 8), Token::Name("bar")),
                 (sp(9, 12), Token::Name("baz")),
-            (sp(12, 13), Token::RightParen)]);
+            (sp(12, 13), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(foo\r\nbar\r\nbaz)"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 4), Token::Name("foo")),
                 (sp(6, 9), Token::Name("bar")),
                 (sp(11, 14), Token::Name("baz")),
-            (sp(14, 15), Token::RightParen)]);
+            (sp(14, 15), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(- 1)"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 2), Token::Name("-")),
                 (sp(3, 4), Token::Integer("1", 10)),
-            (sp(4, 5), Token::RightParen)]);
+            (sp(4, 5), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(foo (bar baz) (spam eggs))"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 4), Token::Name("foo")),
-                (sp(5, 6), Token::LeftParen),
+                (sp(5, 6), Token::LeftParen(ParensKind::Parens)),
                     (sp(6, 9), Token::Name("bar")),
                     (sp(10, 13), Token::Name("baz")),
-                (sp(13, 14), Token::RightParen),
-                (sp(15, 16), Token::LeftParen),
+                (sp(13, 14), Token::RightParen(ParensKind::Parens)),
+                (sp(15, 16), Token::LeftParen(ParensKind::Parens)),
                     (sp(16, 20), Token::Name("spam")),
                     (sp(21, 25), Token::Name("eggs")),
-                (sp(25, 26), Token::RightParen),
-            (sp(26, 27), Token::RightParen)]);
+                (sp(25, 26), Token::RightParen(ParensKind::Parens)),
+            (sp(26, 27), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(foo '(bar baz))"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 4), Token::Name("foo")),
                 (sp(5, 6), Token::Quote),
-                (sp(6, 7), Token::LeftParen),
+                (sp(6, 7), Token::LeftParen(ParensKind::Parens)),
                     (sp(7, 10), Token::Name("bar")),
                     (sp(11, 14), Token::Name("baz")),
-                (sp(14, 15), Token::RightParen),
-            (sp(15, 16), Token::RightParen)]);
+                (sp(14, 15), Token::RightParen(ParensKind::Parens)),
+            (sp(15, 16), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(+ 1 2)"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 2), Token::Name("+")),
                 (sp(3, 4), Token::Integer("1", 10)),
                 (sp(5, 6), Token::Integer("2", 10)),
-            (sp(6, 7), Token::RightParen)]);
+            (sp(6, 7), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("(* 1 2 (+ 3 4))"),
-            [(sp(0, 1), Token::LeftParen),
+            [(sp(0, 1), Token::LeftParen(ParensKind::Parens)),
                 (sp(1, 2), Token::Name("*")),
                 (sp(3, 4), Token::Integer("1", 10)),
                 (sp(5, 6), Token::Integer("2", 10)),
-                (sp(7, 8), Token::LeftParen),
+                (sp(7, 8), Token::LeftParen(ParensKind::Parens)),
                     (sp(8, 9), Token::Name("+")),
                     (sp(10, 11), Token::Integer("3", 10)),
                     (sp(12, 13), Token::Integer("4", 10)),
-                (sp(13, 14), Token::RightParen),
-            (sp(14, 15), Token::RightParen)]);
+                (sp(13, 14), Token::RightParen(ParensKind::Parens)),
+            (sp(14, 15), Token::RightParen(ParensKind::Parens))]);
 
         assert_eq!(tokens("foo ; bar\nbaz"),
             [(sp(0, 3), Token::Name("foo")),

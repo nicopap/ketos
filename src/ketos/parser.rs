@@ -89,8 +89,8 @@ pub enum ParseErrorKind {
     },
     /// Unrecognized character escape
     UnknownCharEscape(char),
-    /// Unmatched `)`
-    UnmatchedParen,
+    /// Unmatched `)}]`
+    UnmatchedParen(ParensKind),
     /// Unterminated character constant
     UnterminatedChar,
     /// Unterminated block comment
@@ -123,10 +123,45 @@ impl fmt::Display for ParseErrorKind {
                 write!(f, "expected {}; found {}", expected, found),
             ParseErrorKind::UnknownCharEscape(ch) =>
                 write!(f, "unknown char escape: {:?}", ch),
-            ParseErrorKind::UnmatchedParen => f.write_str("unmatched `)`"),
+            ParseErrorKind::UnmatchedParen(kind) => write!(f, "unmatched `{}`", kind.close()),
             ParseErrorKind::UnterminatedChar => f.write_str("unterminated char constant"),
             ParseErrorKind::UnterminatedComment => f.write_str("unterminated block comment"),
             ParseErrorKind::UnterminatedString => f.write_str("unterminated string constant"),
+        }
+    }
+}
+
+/// The type of delimiter
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ParensKind {
+    /// A curly bracket, braces `{}`
+    Curly,
+    /// Square brackets `[]` 
+    Bracket,
+    /// Parenthesis, bracket `()`
+    Parens,
+}
+impl ParensKind {
+    pub(crate) fn from_char(ch: char) -> Option<Self> {
+        match ch {
+            '{' | '}' => Some(ParensKind::Curly),
+            '[' | ']' => Some(ParensKind::Bracket),
+            '(' | ')' => Some(ParensKind::Parens),
+            _ => None,
+        }
+    }
+    pub(crate) fn close(&self) -> &'static str {
+        match self {
+            ParensKind::Bracket => "]",
+            ParensKind::Curly => "}",
+            ParensKind::Parens => ")",
+        }
+    }
+    pub(crate) fn open(&self) -> &'static str {
+        match self {
+            ParensKind::Bracket => "[",
+            ParensKind::Curly => "{",
+            ParensKind::Parens => "(",
         }
     }
 }
@@ -140,7 +175,7 @@ enum Group<'lex> {
     /// If zero, this is an unquoted parentheses group.
     Quotes(u32),
     /// Values in a parenthetical expression
-    Parens(Vec<Value>, Option<(Span, &'lex str)>),
+    Parens(ParensKind, Vec<Value>, Option<(Span, &'lex str)>),
 }
 
 impl<'a, 'lex> Parser<'a, 'lex> {
@@ -178,7 +213,7 @@ impl<'a, 'lex> Parser<'a, 'lex> {
                 Token::DocComment(_) =>
                     return Err(From::from(ParseError::new(
                         doc.unwrap().0, ParseErrorKind::CannotDocumentItem))),
-                Token::LeftParen => {
+                Token::LeftParen(kind) => {
                     if let Some((doc_sp, _)) = doc {
                         match self.peek()? {
                             (_, Token::Name("const")) |
@@ -187,27 +222,27 @@ impl<'a, 'lex> Parser<'a, 'lex> {
                             (_, Token::Name("macro")) |
                             (_, Token::Name("struct"))
                                 => (),
-                            _ => return Err(From::from(ParseError::new(
-                                doc_sp, ParseErrorKind::CannotDocumentItem)))
+                            _ => return Err(ParseError::new(
+                                    doc_sp,
+                                    ParseErrorKind::CannotDocumentItem
+                                ).into())
                         }
                     }
 
-                    stack.push(Group::Parens(Vec::new(), doc.take()));
+                    stack.push(Group::Parens(kind, Vec::new(), doc.take()));
                     continue;
                 }
-                Token::RightParen => {
+                Token::RightParen(kind) => {
                     let group = stack.pop().ok_or_else(
-                        || ParseError::new(sp, ParseErrorKind::UnmatchedParen))?;
+                        || ParseError::new(sp, ParseErrorKind::UnmatchedParen(kind)))?;
 
                     match group {
-                        Group::Parens(values, doc) =>
-                            insert_doc_comment(values, doc)
-                                .map_err(From::from),
-                        _ => Err(From::from(ParseError::new(sp,
+                        Group::Parens(_, values, doc) => insert_doc_comment(values, doc).map_err(From::from),
+                        _ => Err(ParseError::new(sp,
                             ParseErrorKind::UnexpectedToken{
                                 expected: "expression",
-                                found: ")",
-                            })))
+                                found: kind.close(),
+                            }).into())
                     }
                 }
                 Token::Float(f) => parse_float(f)
@@ -273,7 +308,7 @@ impl<'a, 'lex> Parser<'a, 'lex> {
                     }
 
                     let any_paren = stack.iter().any(|group| {
-                        matches!(*group,Group::Parens(_, _))
+                        matches!(*group,Group::Parens(_, _, _))
                     });
 
                     if any_paren {
@@ -296,7 +331,7 @@ impl<'a, 'lex> Parser<'a, 'lex> {
             loop {
                 match stack.last_mut() {
                     None => return Ok(v),
-                    Some(&mut Group::Parens(ref mut values, _)) => {
+                    Some(&mut Group::Parens(_, ref mut values, _)) => {
                         values.push(v);
                         break;
                     }
